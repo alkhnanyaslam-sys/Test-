@@ -1,0 +1,14 @@
+{
+  "name": "points-bot",
+  "version": "1.0.0",
+  "description": "بوت تليجرام لنظام نقاط ومستويات المساعدة - يشتغل عبر GitHub Actions (Cron) بدل Long Polling",
+  "main": "index.js",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {}
+}
