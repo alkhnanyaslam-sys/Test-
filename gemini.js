@@ -3,16 +3,10 @@
 // وهل الرد اللي جه عليها فعلاً إجابة/مساعدة حقيقية؟
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-// تقدر تغيّر الموديل من الـ env لو حابب (مثلاً gemini-2.5-flash)
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
 
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
-/**
- * بيرجع:
- * { isHelp: boolean, quality: 1|2|3, reason: string }
- * quality بتحدد عدد النقاط (1 = بسيطة، 3 = إجابة ممتازة ومفصلة)
- */
 async function evaluateHelp(originalMessage, replyMessage) {
   const prompt = `
 انت حكم في جروب تليجرام. مهمتك تحدد بس هل الرسالة التانية (الرد) بتمثل "مساعدة حقيقية" على الرسالة الأولى (سؤال/مشكلة).
@@ -28,9 +22,11 @@ async function evaluateHelp(originalMessage, replyMessage) {
 
 قواعد التقييم:
 - لو الرسالة الأولى مش سؤال ولا فيها مشكلة أصلا (كلام عادي/تحية/دردشة) -> isHelp: false
-- لو الرد مجرد "تمام" أو "ماشي" أو رموز تعبيرية أو مالوش علاقة بالسؤال -> isHelp: false
-- لو الرد بيحاول يساعد لكن بسيط أو ناقص -> isHelp: true, quality: 1
-- لو الرد إجابة واضحة وصحيحة تقريبا -> isHelp: true, quality: 2
+- لو الرد مجرد "تمام" أو "ماشي" أو رموز تعبيرية أو مالوش علاقة بالسؤال خالص -> isHelp: false
+- **مهم**: لو الرد بيدي إجابة مباشرة للسؤال حتى لو كلمة أو رقم واحد بس
+  (مثال: السؤال "الإجابة كام؟" والرد "D" أو "45" أو "لأ")، ده يعتبر مساعدة حقيقية
+  -> isHelp: true, quality: 1. مش شرط الرد يكون طويل أو فيه شرح عشان ياخد نقاط.
+- لو الرد إجابة واضحة وفيها شرح بسيط -> isHelp: true, quality: 2
 - لو الرد إجابة شاملة ومفصلة وحلت المشكلة فعليا -> isHelp: true, quality: 3
 `.trim();
 
