@@ -1,24 +1,23 @@
 // levels.js
-// نظام المستويات: من L1 لغايه L10
-// كل مستوى محتاج 50 نقطة زيادة عن اللي قبله (L1=50, L2=100, ... L10=500)
-// tag: بيتستخدم في رسالة الشكر النصية (فيها إيموجي)
+// نظام المستويات: من LV1 لغايه LV10
+// كل مستوى محتاج 50 نقطة زيادة عن اللي قبله (LV1=50, LV2=100, ... LV10=500)
+// tag: بيتستخدم في رسالة التهنئة (فيها إيموجي)
 // customTitle: بيتستخدم كـ Tag جنب اسم العضو في تليجرام (عن طريق
 // setChatMemberTag) — العضو بيفضل عضو عادي 100%، من غير أي ترقية.
-// خليناها قصيرة وبسيطة من غير إيموجي عشان تتوافق مع أي حد أقصى محتمل.
 
 const POINTS_PER_LEVEL = 50;
 
 const LEVELS = [
-  { level: 1, minPoints: POINTS_PER_LEVEL * 1, tag: "🥉 L1", customTitle: "L1" },
-  { level: 2, minPoints: POINTS_PER_LEVEL * 2, tag: "🥉 L2", customTitle: "L2" },
-  { level: 3, minPoints: POINTS_PER_LEVEL * 3, tag: "🥈 L3", customTitle: "L3" },
-  { level: 4, minPoints: POINTS_PER_LEVEL * 4, tag: "🥈 L4", customTitle: "L4" },
-  { level: 5, minPoints: POINTS_PER_LEVEL * 5, tag: "🥈 L5", customTitle: "L5" },
-  { level: 6, minPoints: POINTS_PER_LEVEL * 6, tag: "🥇 L6", customTitle: "L6" },
-  { level: 7, minPoints: POINTS_PER_LEVEL * 7, tag: "🥇 L7", customTitle: "L7" },
-  { level: 8, minPoints: POINTS_PER_LEVEL * 8, tag: "🥇 L8", customTitle: "L8" },
-  { level: 9, minPoints: POINTS_PER_LEVEL * 9, tag: "💎 L9", customTitle: "L9" },
-  { level: 10, minPoints: POINTS_PER_LEVEL * 10, tag: "👑 L10", customTitle: "L10" },
+  { level: 1, minPoints: POINTS_PER_LEVEL * 1, tag: "🥉 LV1", customTitle: "LV1" },
+  { level: 2, minPoints: POINTS_PER_LEVEL * 2, tag: "🥉 LV2", customTitle: "LV2" },
+  { level: 3, minPoints: POINTS_PER_LEVEL * 3, tag: "🥈 LV3", customTitle: "LV3" },
+  { level: 4, minPoints: POINTS_PER_LEVEL * 4, tag: "🥈 LV4", customTitle: "LV4" },
+  { level: 5, minPoints: POINTS_PER_LEVEL * 5, tag: "🥈 LV5", customTitle: "LV5" },
+  { level: 6, minPoints: POINTS_PER_LEVEL * 6, tag: "🥇 LV6", customTitle: "LV6" },
+  { level: 7, minPoints: POINTS_PER_LEVEL * 7, tag: "🥇 LV7", customTitle: "LV7" },
+  { level: 8, minPoints: POINTS_PER_LEVEL * 8, tag: "🥇 LV8", customTitle: "LV8" },
+  { level: 9, minPoints: POINTS_PER_LEVEL * 9, tag: "💎 LV9", customTitle: "LV9" },
+  { level: 10, minPoints: POINTS_PER_LEVEL * 10, tag: "👑 LV10", customTitle: "LV10" },
 ];
 
 function getLevelForPoints(points) {
