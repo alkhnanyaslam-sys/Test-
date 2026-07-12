@@ -5,7 +5,11 @@
 // (اسم الملف فضل زي ما هو عشان باقي الملفات مش محتاجة تتغير)
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
-const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.1-8b-instant";
+// موديل أقوى في الفهم والدقة (خصوصًا بالعربي) — أهم من كتر الكوتة هنا
+// عشان مننفعش نديّ نقاط غلط. لو الكوتة اليومية بتاعته خلصت، بننزل
+// تلقائيًا لموديل أخف كـ احتياطي بدل ما نوقف التقييم خالص.
+const PRIMARY_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
+const FALLBACK_MODEL = "llama-3.1-8b-instant";
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
@@ -61,13 +65,13 @@ function isDailyQuotaError(errText) {
   return /day|daily/i.test(errText || "");
 }
 
-async function callGroqOnce(prompt) {
+async function callGroqOnce(prompt, model) {
   await waitForRateLimit();
 
   const body = {
-    model: GROQ_MODEL,
+    model,
     messages: [{ role: "user", content: prompt }],
-    temperature: 0.2,
+    temperature: 0.1,
     max_tokens: 300,
   };
 
@@ -97,34 +101,38 @@ async function callGroqOnce(prompt) {
 
 async function evaluateHelp(originalMessage, replyMessage) {
   const prompt = `
-انت حكم في جروب تليجرام. مهمتك تحدد بس هل الرسالة التانية (الرد) بتمثل "مساعدة حقيقية" على الرسالة الأولى (سؤال/مشكلة).
+انت حكم صارم جدًا في جروب تليجرام. مهمتك الوحيدة: تحدد هل الرسالة التانية (الرد) بتمثل "مساعدة حقيقية ومباشرة" على سؤال أو مشكلة محددة في الرسالة الأولى.
 
-الرسالة الأولى (المفروض تكون سؤال أو مشكلة):
+كن متشددًا جدًا. لما تشك، اختار isHelp: false. الهدف إننا مانديش نقاط لأي حد إلا لو ساعد فعلاً وبوضوح.
+
+الرسالة الأولى:
 """${originalMessage}"""
 
 الرد عليها:
 """${replyMessage}"""
 
-قيّم الموقف ورد بصيغة JSON فقط بدون أي كلام تاني وبدون Markdown، بالشكل ده بالظبط:
+رد بصيغة JSON فقط بدون أي كلام تاني وبدون Markdown:
 {"isHelp": true/false, "quality": 1/2/3, "reason": "سبب قصير جدا بالعربي"}
 
-قواعد التقييم:
-- لو الرسالة الأولى مش سؤال ولا فيها مشكلة أصلا (كلام عادي/تحية/دردشة) -> isHelp: false
-- لو الرد مجرد "تمام" أو "ماشي" أو رموز تعبيرية أو مالوش علاقة بالسؤال خالص -> isHelp: false
-- **مهم**: لو الرد بيدي إجابة مباشرة للسؤال حتى لو كلمة أو رقم واحد بس
-  (مثال: السؤال "الإجابة كام؟" والرد "D" أو "45" أو "لأ")، ده يعتبر مساعدة حقيقية
-  -> isHelp: true, quality: 1. مش شرط الرد يكون طويل أو فيه شرح عشان ياخد نقاط.
-- لو الرد إجابة واضحة وفيها شرح بسيط -> isHelp: true, quality: 2
-- لو الرد إجابة شاملة ومفصلة وحلت المشكلة فعليا -> isHelp: true, quality: 3
+قواعد صارمة:
+1. لازم الرسالة الأولى تكون سؤال واضح أو مشكلة محددة محتاجة حل. لو كلام عام، دردشة، رأي، تعليق، تحية، أو حتى سؤال بلاغي مش محتاج إجابة فعلية -> isHelp: false
+2. لازم الرد يجاوب على نفس السؤال ده بالذات، مش موضوع تاني حتى لو قريب منه
+3. ردود زي "تمام" / "ماشي" / "ok" / رموز تعبيرية بس / "مش عارف" / "حاول تسأل حد تاني" -> isHelp: false
+4. لو الرد سؤال إضافي أو استفسار (مش إجابة) -> isHelp: false
+5. لو الرد فيه إجابة مباشرة وواضحة وصحيحة على السؤال (حتى لو كلمة أو رقم واحد بس، زي "D" أو "45" كإجابة اختيار) -> isHelp: true, quality: 1
+6. لو الرد إجابة واضحة وفيها شرح بسيط لتوضيح ليه -> isHelp: true, quality: 2
+7. لو الرد إجابة شاملة ومفصلة وحلت المشكلة فعليًا بشكل واضح -> isHelp: true, quality: 3
+8. لو مش متأكد إن الرد فعلاً بيجاوب على السؤال، اختار isHelp: false
 
-رد بـ JSON بس، من غير أي شرح إضافي.
+رد بـ JSON بس.
 `.trim();
 
   let lastError = null;
+  let modelToUse = PRIMARY_MODEL;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const { text, finishReason } = await callGroqOnce(prompt);
+      const { text, finishReason } = await callGroqOnce(prompt, modelToUse);
 
       if (!text) {
         console.error(
@@ -149,8 +157,15 @@ async function evaluateHelp(originalMessage, replyMessage) {
       lastError = err;
 
       if (err.status === 429 && isDailyQuotaError(err.rawText || "")) {
+        if (modelToUse !== FALLBACK_MODEL) {
+          console.warn(
+            `🔁 الكوتة اليومية لموديل ${modelToUse} خلصت، هنستخدم ${FALLBACK_MODEL} كاحتياطي.`
+          );
+          modelToUse = FALLBACK_MODEL;
+          continue;
+        }
         console.error(
-          "🚫 الكوتة اليومية لـ Groq خلصت بالكامل — هترجع تتجدد الساعة 12 بالليل بتوقيت UTC. مفيش فايدة من إعادة المحاولة دلوقتي."
+          "🚫 الكوتة اليومية خلصت لكل الموديلات المتاحة — هترجع تتجدد بعد شوية."
         );
         break;
       }
