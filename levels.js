@@ -1,8 +1,9 @@
 // levels.js
 // نظام المستويات: من L1 لغايه L10
 // tag: بيتستخدم في رسالة الشكر النصية (فيها إيموجي)
-// customTitle: بيتستخدم كـ Custom Title جنب الاسم في تليجرام
-//   ملاحظة: تليجرام مبيسمحش بإيموجي في الـ custom title، وأقصى طول 16 حرف
+// customTitle: بيتستخدم كـ Tag جنب اسم العضو في تليجرام (عن طريق
+// setChatMemberTag) — العضو بيفضل عضو عادي 100%، من غير أي ترقية.
+// خليناها قصيرة وبسيطة من غير إيموجي عشان تتوافق مع أي حد أقصى محتمل.
 
 const LEVELS = [
   { level: 1, minPoints: 1, tag: "🥉 L1", customTitle: "L1" },
@@ -17,7 +18,6 @@ const LEVELS = [
   { level: 10, minPoints: 200, tag: "👑 L10", customTitle: "L10" },
 ];
 
-// بيرجع أعلى مستوى وصله المستخدم بناءً على نقاطه
 function getLevelForPoints(points) {
   let current = null;
   for (const lvl of LEVELS) {
@@ -27,17 +27,16 @@ function getLevelForPoints(points) {
       break;
     }
   }
-  return current; // ممكن يكون null لو النقاط لسه 0
+  return current;
 }
 
-// بيرجع تفاصيل المستوى الجاي (عشان نعرض "باقي كام نقطة")
 function getNextLevel(points) {
   for (const lvl of LEVELS) {
     if (points < lvl.minPoints) {
       return lvl;
     }
   }
-  return null; // يبقى وصل لأعلى مستوى (L10)
+  return null;
 }
 
 module.exports = { LEVELS, getLevelForPoints, getNextLevel };
