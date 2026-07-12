@@ -124,7 +124,7 @@ async function processBatch(updates, users, currentOffset, startTime) {
 
 async function main() {
   if (!process.env.BOT_TOKEN) throw new Error("BOT_TOKEN مش موجود في الـ environment variables");
-  if (!process.env.GEMINI_API_KEY) throw new Error("GEMINI_API_KEY مش موجود");
+  if (!process.env.GROQ_API_KEY) throw new Error("GROQ_API_KEY مش موجود");
 
   let offset = getOffset();
   const users = loadUsers();
