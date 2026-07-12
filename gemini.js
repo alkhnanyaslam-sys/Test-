@@ -3,7 +3,9 @@
 // وهل الرد اللي جه عليها فعلاً إجابة/مساعدة حقيقية؟
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+// flash-lite ليها كوتة يومية منفصلة وأعلى من flash العادي، ومناسبة
+// جدًا لمهمة تصنيف بسيطة زي دي
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash-lite";
 
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
@@ -54,6 +56,13 @@ function extractSuggestedDelayMs(errText) {
     if (Number.isFinite(seconds)) return Math.ceil(seconds * 1000);
   }
   return null;
+}
+
+// لو الخطأ خاص بكوتة يومية (PerDay) مش كوتة بالدقيقة، مفيش فايدة من
+// إعادة المحاولة في نفس التشغيلة — الكوتة دي بترجع تتجدد الساعة 12
+// بالليل بتوقيت المحيط الهادي بس
+function isDailyQuotaError(errText) {
+  return /PerDay/i.test(errText || "");
 }
 
 async function callGeminiOnce(prompt) {
@@ -135,6 +144,13 @@ async function evaluateHelp(originalMessage, replyMessage) {
       };
     } catch (err) {
       lastError = err;
+
+      if (err.status === 429 && isDailyQuotaError(err.rawText || "")) {
+        console.error(
+          "🚫 الكوتة اليومية لموديل Gemini خلصت بالكامل — هترجع تتجدد الساعة 12 بالليل بتوقيت المحيط الهادي. مفيش فايدة من إعادة المحاولة دلوقتي."
+        );
+        break;
+      }
 
       if (err.status === 429 && attempt < MAX_RETRIES) {
         const suggested = extractSuggestedDelayMs(err.rawText || "");
