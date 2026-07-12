@@ -2,24 +2,23 @@ name: Points Bot Runner
 
 on:
   schedule:
-    # كل 5 دقايق (GitHub مش بيضمن الدقة 100%، ممكن يتأخر شوية وقت الزحمة)
-    - cron: "*/5 * * * *"
+    # شبكة أمان بس، لإن السيلف-تشينينج تحت هو المسؤول الأساسي عن
+    # الاستمرارية. لو حصل أي عطل والسلسلة اتقطعت، الـ cron ده هيرجعها
+    - cron: "*/10 * * * *"
   workflow_dispatch: {} # يسمحلك تشغّله يدوي من تاب Actions
 
 # يمنع تشغيل أكتر من نسخة في نفس الوقت لنفس البوت
-# لو تشغيلة لسه شغالة، اللي بعدها بينتظر بدل ما يشتغل جنبها
 concurrency:
   group: points-bot-runner
   cancel-in-progress: false
 
 permissions:
   contents: write # عشان يقدر يعمل commit/push لملفات data.json و offset.json
+  actions: write # عشان يقدر يشغّل نفسه تاني (self-chaining)
 
 jobs:
   run-bot:
     runs-on: ubuntu-latest
-    # index.js دلوقتي بيفضل شغال لحد 4.5 دقيقة (long polling)، فبنحط
-    # حد أقصى 6 دقايق كشبكة أمان لو حصل أي تعليق غير متوقع
     timeout-minutes: 6
     steps:
       - name: Checkout repo
@@ -47,3 +46,14 @@ jobs:
           git add data.json offset.json
           git diff --staged --quiet || git commit -m "🔄 تحديث نقاط ومستويات المستخدمين [skip ci]"
           git push
+
+      # بيشغّل تشغيلة جديدة فورًا بمجرد ما دي تخلص، بدل ما يستنى
+      # الـ scheduler بتاع GitHub (اللي أحيانًا بيتأخر دقايق وقت الزحمة)
+      - name: Trigger next run immediately
+        if: always()
+        run: |
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/${{ github.repository }}/actions/workflows/bot.yml/dispatches \
+            -d '{"ref":"${{ github.ref_name }}"}'
