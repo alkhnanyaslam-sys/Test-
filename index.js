@@ -10,6 +10,12 @@ const { awardPoints } = require("./points");
 const { isThankYouMessage } = require("./thanks");
 const { handleCommand } = require("./commands");
 
+const THANK_YOU_POINTS = 5;
+
+const THANK_YOU_REASON =
+  "🌟 حد قدّر مساعدتك وشكرك عليها، وده دليل إنك بتفرق فعلاً مع زمايلك.\n" +
+  "استمر كده، كل مساعدة بتقرّبك خطوة لمستوى أقوى 💪";
+
 async function processUpdate(update, users) {
   const msg = update.message;
   if (!msg) return;
@@ -32,9 +38,9 @@ async function processUpdate(update, users) {
     const { text } = await awardPoints({
       chatId,
       targetFrom: originalAuthor,
-      pointsToAdd: 1,
+      pointsToAdd: THANK_YOU_POINTS,
       users,
-      reasonText: "سبب الإضافة إن حد شكرك على مساعدتك ليه، إستمر في كده.",
+      reasonText: THANK_YOU_REASON,
     });
     await sendMessage(chatId, text, msg.message_id);
     return;
