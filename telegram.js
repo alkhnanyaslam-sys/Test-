@@ -5,9 +5,12 @@
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const TELEGRAM_API = `https://api.telegram.org/bot${BOT_TOKEN}`;
 
-async function getUpdates(offset) {
+// timeoutSeconds > 0 يخلي الطلب "long polling": تليجرام بيفضل مستني
+// لحد ما توصل رسالة جديدة أو تخلص المدة دي، بدل ما يرجع فاضي على طول.
+// ده اللي بيخلي البوت يحس إنه شغال لحظيًا من غير ما نعمل استعلامات كتير.
+async function getUpdates(offset, timeoutSeconds = 0) {
   const allowedUpdates = encodeURIComponent(JSON.stringify(["message"]));
-  const url = `${TELEGRAM_API}/getUpdates?offset=${offset}&timeout=0&allowed_updates=${allowedUpdates}`;
+  const url = `${TELEGRAM_API}/getUpdates?offset=${offset}&timeout=${timeoutSeconds}&allowed_updates=${allowedUpdates}`;
   const res = await fetch(url);
   const data = await res.json();
   if (!data.ok) throw new Error(`Telegram getUpdates error: ${JSON.stringify(data)}`);
