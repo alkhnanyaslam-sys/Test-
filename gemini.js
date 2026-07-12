@@ -8,10 +8,9 @@ const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
 // ---- إعدادات التحكم في معدل الطلبات ----
-// الفري تير بتاع gemini-2.5-flash محدود بـ 5 طلبات/دقيقة تقريبًا
-// فبنخلي مسافة آمنة بين كل طلب والتاني (13 ثانية = أقل من 5 في الدقيقة)
-const MIN_INTERVAL_MS = 13000;
-const MAX_RETRIES = 3;
+const MIN_INTERVAL_MS = 13000; // أقل مسافة بين كل طلب والتاني
+const MAX_RETRIES = 2; // أقصى عدد محاولات إضافية بعد المحاولة الأولى
+const MAX_RETRY_WAIT_MS = 20000; // سقف الانتظار لكل محاولة، عشان محاولة واحدة متاكلش وقت التشغيلة كله
 
 let lastCallTime = 0;
 
@@ -19,7 +18,6 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// بيتأكد إن في مسافة كافية من آخر طلب اتبعت قبل ما يبعت الطلب الجديد
 async function waitForRateLimit() {
   const now = Date.now();
   const elapsed = now - lastCallTime;
@@ -29,15 +27,12 @@ async function waitForRateLimit() {
   lastCallTime = Date.now();
 }
 
-// بيحاول يستخرج أول object JSON صحيح من النص حتى لو فيه كلام زيادة حواليه
+// بيدور على أول object JSON صحيح في النص حتى لو فيه كلام زيادة حواليه
 function extractJson(text) {
   const cleaned = text.replace(/```json|```/g, "").trim();
-
-  // محاولة مباشرة الأول
   try {
     return JSON.parse(cleaned);
   } catch (_) {
-    // لو فشلت، ندور على أول { ... } متكامل في النص
     const match = cleaned.match(/\{[\s\S]*\}/);
     if (match) {
       try {
@@ -48,6 +43,17 @@ function extractJson(text) {
     }
     return null;
   }
+}
+
+// بيدور على الوقت اللي جوجل نفسها بتقترحه في رسالة الخطأ
+// (مثال: "Please retry in 15.897581271s.") ويرجعه بالميلي ثانية
+function extractSuggestedDelayMs(errText) {
+  const match = errText.match(/retry in ([\d.]+)s/i);
+  if (match) {
+    const seconds = parseFloat(match[1]);
+    if (Number.isFinite(seconds)) return Math.ceil(seconds * 1000);
+  }
+  return null;
 }
 
 async function callGeminiOnce(prompt) {
@@ -68,6 +74,7 @@ async function callGeminiOnce(prompt) {
     const errText = await res.text();
     const err = new Error(`Gemini API error (${res.status}): ${errText}`);
     err.status = res.status;
+    err.rawText = errText;
     throw err;
   }
 
@@ -129,19 +136,20 @@ async function evaluateHelp(originalMessage, replyMessage) {
     } catch (err) {
       lastError = err;
 
-      // لو 429 (تجاوز الكوتة)، ناخد وقت أطول ونحاول تاني
       if (err.status === 429 && attempt < MAX_RETRIES) {
-        const backoff = MIN_INTERVAL_MS * (attempt + 2); // زيادة تدريجية
+        const suggested = extractSuggestedDelayMs(err.rawText || "");
+        // بنستخدم رقم جوجل نفسها لو موجود، وإلا بديل ثابت، وبنحط سقف
+        // أقصى عشان رسالة واحدة متاكلش وقت التشغيلة كله
+        const wait = Math.min(suggested || 10000, MAX_RETRY_WAIT_MS);
         console.warn(
           `⏳ Gemini rate limit (429)، إعادة محاولة بعد ${Math.round(
-            backoff / 1000
+            wait / 1000
           )} ثانية... (محاولة ${attempt + 1}/${MAX_RETRIES})`
         );
-        await sleep(backoff);
+        await sleep(wait);
         continue;
       }
 
-      // أي خطأ تاني أو خلصت المحاولات
       break;
     }
   }
