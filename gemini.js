@@ -7,6 +7,77 @@ const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
+// ---- إعدادات التحكم في معدل الطلبات ----
+// الفري تير بتاع gemini-2.5-flash محدود بـ 5 طلبات/دقيقة تقريبًا
+// فبنخلي مسافة آمنة بين كل طلب والتاني (13 ثانية = أقل من 5 في الدقيقة)
+const MIN_INTERVAL_MS = 13000;
+const MAX_RETRIES = 3;
+
+let lastCallTime = 0;
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// بيتأكد إن في مسافة كافية من آخر طلب اتبعت قبل ما يبعت الطلب الجديد
+async function waitForRateLimit() {
+  const now = Date.now();
+  const elapsed = now - lastCallTime;
+  if (elapsed < MIN_INTERVAL_MS) {
+    await sleep(MIN_INTERVAL_MS - elapsed);
+  }
+  lastCallTime = Date.now();
+}
+
+// بيحاول يستخرج أول object JSON صحيح من النص حتى لو فيه كلام زيادة حواليه
+function extractJson(text) {
+  const cleaned = text.replace(/```json|```/g, "").trim();
+
+  // محاولة مباشرة الأول
+  try {
+    return JSON.parse(cleaned);
+  } catch (_) {
+    // لو فشلت، ندور على أول { ... } متكامل في النص
+    const match = cleaned.match(/\{[\s\S]*\}/);
+    if (match) {
+      try {
+        return JSON.parse(match[0]);
+      } catch (_) {
+        return null;
+      }
+    }
+    return null;
+  }
+}
+
+async function callGeminiOnce(prompt) {
+  await waitForRateLimit();
+
+  const body = {
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    generationConfig: { temperature: 0.2, maxOutputTokens: 1000 },
+  };
+
+  const res = await fetch(GEMINI_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    const err = new Error(`Gemini API error (${res.status}): ${errText}`);
+    err.status = res.status;
+    throw err;
+  }
+
+  const data = await res.json();
+  const candidate = data?.candidates?.[0];
+  const text = candidate?.content?.parts?.[0]?.text?.trim() || "";
+
+  return { text, finishReason: candidate?.finishReason };
+}
+
 async function evaluateHelp(originalMessage, replyMessage) {
   const prompt = `
 انت حكم في جروب تليجرام. مهمتك تحدد بس هل الرسالة التانية (الرد) بتمثل "مساعدة حقيقية" على الرسالة الأولى (سؤال/مشكلة).
@@ -30,39 +101,53 @@ async function evaluateHelp(originalMessage, replyMessage) {
 - لو الرد إجابة شاملة ومفصلة وحلت المشكلة فعليا -> isHelp: true, quality: 3
 `.trim();
 
-  const body = {
-    contents: [{ role: "user", parts: [{ text: prompt }] }],
-    generationConfig: { temperature: 0.2, maxOutputTokens: 200 },
-  };
+  let lastError = null;
 
-  const res = await fetch(GEMINI_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const { text, finishReason } = await callGeminiOnce(prompt);
 
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Gemini API error (${res.status}): ${errText}`);
+      if (!text) {
+        console.error(
+          `⚠️ رد Gemini فاضي (finishReason: ${finishReason || "غير معروف"})`
+        );
+        return { isHelp: false, quality: 0, reason: "رد فاضي من Gemini" };
+      }
+
+      const parsed = extractJson(text);
+
+      if (!parsed) {
+        console.error("⚠️ فشل تحليل رد Gemini:", text);
+        return { isHelp: false, quality: 0, reason: "تعذر التقييم" };
+      }
+
+      return {
+        isHelp: !!parsed.isHelp,
+        quality: [1, 2, 3].includes(parsed.quality) ? parsed.quality : 1,
+        reason: parsed.reason || "",
+      };
+    } catch (err) {
+      lastError = err;
+
+      // لو 429 (تجاوز الكوتة)، ناخد وقت أطول ونحاول تاني
+      if (err.status === 429 && attempt < MAX_RETRIES) {
+        const backoff = MIN_INTERVAL_MS * (attempt + 2); // زيادة تدريجية
+        console.warn(
+          `⏳ Gemini rate limit (429)، إعادة محاولة بعد ${Math.round(
+            backoff / 1000
+          )} ثانية... (محاولة ${attempt + 1}/${MAX_RETRIES})`
+        );
+        await sleep(backoff);
+        continue;
+      }
+
+      // أي خطأ تاني أو خلصت المحاولات
+      break;
+    }
   }
 
-  const data = await res.json();
-  const text =
-    data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
-
-  const cleaned = text.replace(/```json|```/g, "").trim();
-
-  try {
-    const parsed = JSON.parse(cleaned);
-    return {
-      isHelp: !!parsed.isHelp,
-      quality: [1, 2, 3].includes(parsed.quality) ? parsed.quality : 1,
-      reason: parsed.reason || "",
-    };
-  } catch (err) {
-    console.error("⚠️ فشل تحليل رد Gemini:", cleaned);
-    return { isHelp: false, quality: 0, reason: "تعذر التقييم" };
-  }
+  console.error("⚠️ خطأ في تقييم Gemini:", lastError?.message || lastError);
+  return { isHelp: false, quality: 0, reason: "تعذر التقييم" };
 }
 
 module.exports = { evaluateHelp };
