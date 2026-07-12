@@ -116,9 +116,17 @@
       "userId": 6227933498,
       "chatId": -1003847307131,
       "username": "@simplyurboba",
-      "points": 15,
+      "points": 20,
       "level": 0,
-      "helpCount": 3
+      "helpCount": 4
+    },
+    "-1003847307131:8751828969": {
+      "userId": 8751828969,
+      "chatId": -1003847307131,
+      "username": "@doaa_ll",
+      "points": 5,
+      "level": 0,
+      "helpCount": 1
     }
   }
 }
