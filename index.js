@@ -16,6 +16,7 @@ const { isThankYouMessage } = require("./thanks");
 const { handleCommand } = require("./commands");
 
 const THANK_YOU_POINTS = 5;
+const HELP_POINTS = 5;
 
 const THANK_YOU_REASON =
   "🌟 حد قدّر مساعدتك وشكرك عليها، وده دليل إنك بتفرق فعلاً مع زمايلك.\n" +
@@ -66,7 +67,7 @@ async function processNonCommandMessage(msg, users) {
   const { text } = await awardPoints({
     chatId,
     targetFrom: msg.from,
-    pointsToAdd: evaluation.quality,
+    pointsToAdd: HELP_POINTS,
     users,
   });
 
