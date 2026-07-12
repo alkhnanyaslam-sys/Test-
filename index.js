@@ -1,9 +1,12 @@
 // index.js
 // السكريبت الرئيسي. بيشتغل جوه الـ workflow لمدة كام دقيقة (مش تشغيلة
 // واحدة وخلاص)، وبيستخدم Long Polling طول الفترة دي عشان الأوامر
-// والرسايل تتنفذ لحظيًا تقريبًا. لسه مفيش bot.launch() ولا استعلامات
-// من غير حدود — كل حاجة بتقف لوحدها قبل ما الـ job يتقفل، فمفيش خطر
-// 409 Conflict مع تشغيلة تانية.
+// والرسايل تتنفذ لحظيًا تقريبًا.
+//
+// مهم: الأوامر (زي أوامر الأونر، سواء في الجروب أو الخاص) بتتاخد
+// أولوية مطلقة — بتتنفذ في أول باس فورًا، قبل أي محاولة تقييم مع
+// Gemini. كده لو حصل تأخير أو rate limit مع Gemini، الأوامر برضو
+// بترد على طول ومش بتستنى الدور.
 
 const { getOffset, saveOffset, loadUsers, saveUsers } = require("./db");
 const { evaluateHelp } = require("./gemini");
@@ -18,20 +21,17 @@ const THANK_YOU_REASON =
   "🌟 حد قدّر مساعدتك وشكرك عليها، وده دليل إنك بتفرق فعلاً مع زمايلك.\n" +
   "استمر كده، كل مساعدة بتقرّبك خطوة لمستوى أقوى 💪";
 
-// الـ workflow بيتشغل كل 5 دقايق (300 ثانية). بنسيب هامش أمان كويس
-// عشان الـ job يقفل قبل ما التشغيلة الجاية تيجي، ومايحصلش تراكم.
+// الـ workflow بيتشغل كل 5 دقايق. بنسيب هامش أمان عشان الـ job يقفل
+// قبل ما التشغيلة الجاية تيجي، ومايحصلش تراكم أو تعارض.
 const TOTAL_BUDGET_MS = 4.5 * 60 * 1000; // 4 دقايق ونص
 const LONG_POLL_SECONDS = 25; // مدة انتظار تليجرام لكل استعلام (long polling)
+const SAFETY_MARGIN_MS = 15000; // بنوقف المعالجة قبل نهاية الميزانية بـ 15 ثانية
 
-async function processUpdate(update, users) {
-  const msg = update.message;
-  if (!msg) return;
+function isCommandMessage(msg) {
+  return !!(msg && msg.text && msg.text.trim().startsWith("/"));
+}
 
-  if (msg.text && msg.text.trim().startsWith("/")) {
-    await handleCommand(msg, users);
-    return;
-  }
-
+async function processNonCommandMessage(msg, users) {
   if (!msg.text) return;
   if (!msg.reply_to_message || !msg.reply_to_message.text) return;
   if (msg.from.is_bot) return;
@@ -73,6 +73,54 @@ async function processUpdate(update, users) {
   await sendMessage(chatId, text, msg.message_id);
 }
 
+// بيعالج دفعة الرسايل اللي رجعت من استعلام واحد. بيرجع الـ offset
+// الجديد (آخر update_id اتعالج فعليًا + 1).
+async function processBatch(updates, users, currentOffset, startTime) {
+  let offset = currentOffset;
+
+  // باس أول: أي رسالة أمر (تبدأ بـ /) بتتاخد فورًا، بغض النظر عن
+  // ترتيبها، لإنها سريعة ومفيهاش انتظار مع Gemini.
+  const handledIds = new Set();
+  for (const update of updates) {
+    const msg = update.message;
+    if (isCommandMessage(msg)) {
+      try {
+        await handleCommand(msg, users);
+      } catch (err) {
+        console.error(`⚠️ خطأ في تنفيذ أمر (update ${update.update_id}):`, err.message);
+      }
+      handledIds.add(update.update_id);
+    }
+  }
+
+  // باس تاني: بترتيب وصول الرسايل الأصلي، عشان الـ offset يتقدم صح
+  // وأي رسالة اتأجلت بسبب الوقت تفضل موجودة للمرة الجاية.
+  for (const update of updates) {
+    if (handledIds.has(update.update_id)) {
+      offset = update.update_id + 1;
+      continue;
+    }
+
+    const remaining = TOTAL_BUDGET_MS - (Date.now() - startTime);
+    if (remaining < SAFETY_MARGIN_MS) {
+      console.log("⏸️ الوقت المتاح خلص، هنكمل الباقي في التشغيلة الجاية");
+      break;
+    }
+
+    const msg = update.message;
+    if (msg) {
+      try {
+        await processNonCommandMessage(msg, users);
+      } catch (err) {
+        console.error(`⚠️ خطأ في معالجة update ${update.update_id}:`, err.message);
+      }
+    }
+    offset = update.update_id + 1;
+  }
+
+  return offset;
+}
+
 async function main() {
   if (!process.env.BOT_TOKEN) throw new Error("BOT_TOKEN مش موجود في الـ environment variables");
   if (!process.env.GEMINI_API_KEY) throw new Error("GEMINI_API_KEY مش موجود");
@@ -89,8 +137,6 @@ async function main() {
   while (Date.now() - startTime < TOTAL_BUDGET_MS) {
     cycles++;
 
-    // نحسب أقصى وقت ممكن نستنى فيه في الاستعلام ده من غير ما نتخطى
-    // الميزانية الكلية بتاعة الـ job
     const remainingMs = TOTAL_BUDGET_MS - (Date.now() - startTime);
     const pollSeconds = Math.max(1, Math.min(LONG_POLL_SECONDS, Math.floor(remainingMs / 1000)));
 
@@ -99,7 +145,6 @@ async function main() {
       updates = await getUpdates(offset, pollSeconds);
     } catch (err) {
       console.error("⚠️ خطأ في getUpdates:", err.message);
-      // لو حصل خطأ شبكة مؤقت، ناخد نفس قصير ونحاول تاني بدل ما نوقف الجوب كله
       await new Promise((r) => setTimeout(r, 3000));
       continue;
     }
@@ -107,20 +152,9 @@ async function main() {
     if (updates.length > 0) {
       totalUpdates += updates.length;
       console.log(`✅ لقيت ${updates.length} رسالة جديدة (دورة ${cycles})`);
-    }
 
-    for (const update of updates) {
-      try {
-        await processUpdate(update, users);
-      } catch (err) {
-        console.error(`⚠️ خطأ في معالجة update ${update.update_id}:`, err.message);
-      }
-      offset = update.update_id + 1;
-    }
+      offset = await processBatch(updates, users, offset, startTime);
 
-    // بنحفظ بعد كل دورة (مش بس في الآخر) عشان لو الجوب اتقفل فجأة
-    // (timeout أو إلغاء)، أقل قد ما يتفقد من التقدم
-    if (updates.length > 0) {
       saveUsers(users);
       saveOffset(offset);
     }
