@@ -9,7 +9,7 @@
 // بترد على طول ومش بتستنى الدور.
 
 const { getOffset, saveOffset, loadUsers, saveUsers } = require("./db");
-const { evaluateHelp } = require("./gemini");
+const { evaluateHelp, evaluateStandaloneHelp } = require("./gemini");
 const { getUpdates, sendMessage } = require("./telegram");
 const { awardPoints } = require("./points");
 const { isThankYouMessage } = require("./thanks");
@@ -43,9 +43,22 @@ async function processNonCommandMessage(msg, users) {
   const originalAuthor = msg.reply_to_message.from;
 
   if (isThankYouMessage(msg.text)) {
+    const answerMsg = msg.reply_to_message; // الرسالة اللي المفروض فيها المساعدة
+
+    let verification;
+    try {
+      verification = await evaluateStandaloneHelp(answerMsg.text);
+    } catch (err) {
+      console.error("⚠️ خطأ في التحقق من رسالة الشكر:", err.message);
+      return;
+    }
+
+    // لو الرسالة اللي اتشكر عليها مكنتش فعلاً مساعدة حقيقية، مبنديش نقاط
+    if (!verification.isHelp) return;
+
     const { text } = await awardPoints({
       chatId,
-      targetFrom: originalAuthor,
+      targetFrom: answerMsg.from,
       pointsToAdd: THANK_YOU_POINTS,
       users,
       reasonText: THANK_YOU_REASON,
