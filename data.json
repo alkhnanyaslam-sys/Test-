@@ -84,9 +84,41 @@
       "userId": 8608243872,
       "chatId": -1003847307131,
       "username": "ma7moud",
+      "points": 30,
+      "level": 0,
+      "helpCount": 6
+    },
+    "-1003847307131:8908163458": {
+      "userId": 8908163458,
+      "chatId": -1003847307131,
+      "username": "ⲘⲀⲎⲘⲞⴑⲆ💯",
+      "points": 15,
+      "level": 0,
+      "helpCount": 3
+    },
+    "-1003847307131:7565590521": {
+      "userId": 7565590521,
+      "chatId": -1003847307131,
+      "username": "@z_i2ad",
+      "points": 30,
+      "level": 0,
+      "helpCount": 6
+    },
+    "-1003847307131:7752823139": {
+      "userId": 7752823139,
+      "chatId": -1003847307131,
+      "username": "X",
       "points": 5,
       "level": 0,
       "helpCount": 1
+    },
+    "-1003847307131:6227933498": {
+      "userId": 6227933498,
+      "chatId": -1003847307131,
+      "username": "@simplyurboba",
+      "points": 305,
+      "level": 0,
+      "helpCount": 2
     }
   }
 }
