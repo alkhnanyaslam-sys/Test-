@@ -44,9 +44,9 @@
       "userId": 5339516793,
       "chatId": -1003847307131,
       "username": "@za_01n",
-      "points": 55,
+      "points": 60,
       "level": 0,
-      "helpCount": 11
+      "helpCount": 12
     },
     "-1003847307131:7446619342": {
       "userId": 7446619342,
@@ -61,6 +61,22 @@
       "chatId": -1003847307131,
       "username": "Zahraa Ebrahim",
       "points": 2,
+      "level": 0,
+      "helpCount": 1
+    },
+    "-1003847307131:6624206188": {
+      "userId": 6624206188,
+      "chatId": -1003847307131,
+      "username": "@LOL112009",
+      "points": 5,
+      "level": 0,
+      "helpCount": 1
+    },
+    "-1003847307131:8585388765": {
+      "userId": 8585388765,
+      "chatId": -1003847307131,
+      "username": "@R54NU",
+      "points": 5,
       "level": 0,
       "helpCount": 1
     }
