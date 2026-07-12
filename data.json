@@ -28,7 +28,15 @@
       "userId": 8210229076,
       "chatId": -1003847307131,
       "username": "✨X✨",
-      "points": 2,
+      "points": 4,
+      "level": 0,
+      "helpCount": 2
+    },
+    "-1003847307131:6048563276": {
+      "userId": 6048563276,
+      "chatId": -1003847307131,
+      "username": "@Mohaamed2006",
+      "points": 1,
       "level": 0,
       "helpCount": 1
     }
