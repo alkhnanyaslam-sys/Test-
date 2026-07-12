@@ -4,9 +4,33 @@
       "userId": 8627997054,
       "chatId": -1003918211293,
       "username": "@FFTBN",
-      "points": 153,
+      "points": 199,
       "level": 0,
-      "helpCount": 33
+      "helpCount": 43
+    },
+    "-1003847307131:7167182484": {
+      "userId": 7167182484,
+      "chatId": -1003847307131,
+      "username": "@AVM7D",
+      "points": 5,
+      "level": 0,
+      "helpCount": 1
+    },
+    "-1003918211293:8355232956": {
+      "userId": 8355232956,
+      "chatId": -1003918211293,
+      "username": "@v_es4",
+      "points": 5,
+      "level": 0,
+      "helpCount": 1
+    },
+    "-1003847307131:8210229076": {
+      "userId": 8210229076,
+      "chatId": -1003847307131,
+      "username": "✨X✨",
+      "points": 2,
+      "level": 0,
+      "helpCount": 1
     }
   }
 }
