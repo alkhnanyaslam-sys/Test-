@@ -1,5 +1,5 @@
 // points.js
-// منطق مشترك: إضافة نقاط + بناء رسالة التهنئة + تاج لو صعد مستوى
+// منطق مشترك: إضافة نقاط + بناء رسالة التهنئة بشكل مرتب + تاج لو صعد مستوى
 // (من غير أي ترقية — العضو بيفضل عضو عادي).
 // مستخدم من: التقييم التلقائي (Gemini)، كشف رسائل الشكر، وأوامر الأونر.
 
@@ -15,7 +15,9 @@ const {
 const CELEBRATION_EMOJI_1 = "5433609082319708485";
 const CELEBRATION_EMOJI_2 = "5229027828527309057";
 
-const DEFAULT_REASON = "سبب الإضافة أنك تساعد أصدقائك، إستمر في ذلك.";
+const DEFAULT_REASON =
+  "لقد قمت بإرسال معلومة صحيحة وساعدت زملائك، جزاك الله خيرًا.\n" +
+  "تابع واستمر في مساعدة أصدقائك لتحصل على LVL قوي‼️";
 
 async function awardPoints({ chatId, targetFrom, pointsToAdd, users, reasonText }) {
   const targetId = targetFrom.id;
@@ -30,15 +32,18 @@ async function awardPoints({ chatId, targetFrom, pointsToAdd, users, reasonText 
   const user = addPoints(users, targetId, chatId, displayName, pointsToAdd);
   const newLevel = getLevelForPoints(user.points);
 
-  let text = `تهانينا تم إضافة ${pointsToAdd} نقاط في رصيدك: ${mention}\n${
-    reasonText || DEFAULT_REASON
-  }`;
+  const reason = escapeHtml(reasonText || DEFAULT_REASON);
+
+  let text =
+    `✅ <b>تم إضافة ${pointsToAdd} نقاط في رصيد</b>\n` +
+    `🌱 ${mention}\n\n` +
+    `<blockquote>${reason}</blockquote>`;
 
   const leveledUp = (oldLevel?.level || 0) !== (newLevel?.level || 0);
   if (leveledUp && newLevel) {
     const emoji1 = customEmoji(CELEBRATION_EMOJI_1, "🎉");
     const emoji2 = customEmoji(CELEBRATION_EMOJI_2, "🏆");
-    text += `\n\n${emoji1} مبروك! وصلت لمستوى جديد: ${escapeHtml(newLevel.tag)} ${emoji2}`;
+    text += `\n\n${emoji1} مبروك! وصلت لمستوى جديد: <b>${escapeHtml(newLevel.tag)}</b> ${emoji2}`;
 
     const tagged = await setMemberTag(chatId, targetId, newLevel.customTitle);
     if (!tagged) {
@@ -49,7 +54,7 @@ async function awardPoints({ chatId, targetFrom, pointsToAdd, users, reasonText 
     const next = getNextLevel(user.points);
     if (next) {
       const remaining = next.minPoints - user.points;
-      text += `\nباقيلك ${remaining} نقطة للوصول لـ ${escapeHtml(next.tag)}`;
+      text += `\n\n📊 باقيلك <b>${remaining}</b> نقطة للوصول لـ ${escapeHtml(next.tag)}`;
     }
   }
 
